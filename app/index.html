@@ -1,1 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body {
+      font-family: "Open Sans", Arial, sans-serif;
+    }
 
+    .menu-btn {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: right 0.3s ease;
+      z-index: 10;
+    }
+
+    .menu-btn.deslocado {
+      right: 276px;
+    }
+
+    .menu-btn span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: #000;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 260px;
+      height: 100%;
+      background: #fff;
+      border-left: 1px solid #ccc;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar.aberta {
+      transform: translateX(0);
+    }
+
+    .sidebar table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .sidebar th,
+    .sidebar td {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+
+    .sidebar th {
+      border-bottom: 1px solid #ccc;
+      font-weight: 600;
+    }
+
+    .sidebar tbody tr {
+      cursor: pointer;
+    }
+
+    .sidebar tbody tr:hover {
+      background: #f5f5f5;
+    }
+
+    #conteudo {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    #conteudo .titulo {
+      font-size: 2.5rem;
+      margin: 0 0 12px;
+    }
+
+    #conteudo .subtitulo {
+      font-size: 1.1rem;
+      font-style: italic;
+      color: #666;
+      margin: 0;
+    }
+    #conteudo.carregado {
+      position: static;
+      top: auto;
+      left: auto;
+      transform: none;
+      text-align: left;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 60px 24px;
+    }
+
+    #conteudo.carregado :first-child {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="menu-btn deslocado" id="menuBtn">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+
+  <div id="conteudo">
+    <p class="titulo"><strong>"Nada"</strong> foi encontrado</p>
+    <p class="subtitulo">Escolha um arquivo a direita pra Abrir</p>
+  </div>
+
+  <div class="sidebar aberta" id="sidebar">
+    <table id="tabela">
+      <thead><tr id="tabelaHead"></tr></thead>
+      <tbody id="tabelaBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const menuBtn = document.getElementById('menuBtn');
+    const sidebar = document.getElementById('sidebar');
+    const tabelaHead = document.getElementById('tabelaHead');
+    const tabelaBody = document.getElementById('tabelaBody');
+    const conteudo = document.getElementById('conteudo');
+
+    menuBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('aberta');
+      menuBtn.classList.toggle('deslocado');
+    });
+
+    // A primeira linha segue o formato "user;repo@campo1;campo2;...".
+    // "user" e "repo" (antes do @) valem pro csv inteiro (mesmo repositório
+    // pra todos os arquivos) e são guardados à parte, sem aparecer na tabela.
+    // As linhas de dados são só "campo1;campo2;..." (ex: "name;something").
+    function parseCabecalho(linha) {
+      const arroba = linha.indexOf('@');
+      const [user, repo] = linha.slice(0, arroba).split(';');
+      const campos = linha.slice(arroba + 1).split(';');
+      return { user, repo, campos };
+    }
+
+    fetch('list.csv')
+      .then(res => res.text())
+      .then(texto => {
+        const linhas = texto.trim().split('\n').filter(Boolean);
+
+        const { user, repo, campos: nomesColunas } = parseCabecalho(linhas[0]);
+
+        nomesColunas.forEach(nome => {
+          const th = document.createElement('th');
+          th.textContent = nome;
+          tabelaHead.appendChild(th);
+        });
+
+        linhas.slice(2).forEach(linha => {
+          const campos = linha.split(';');
+          const tr = document.createElement('tr');
+
+          campos.forEach(valor => {
+            const td = document.createElement('td');
+            td.textContent = valor;
+            tr.appendChild(td);
+          });
+
+          tr.addEventListener('click', () => {
+            const nome = campos[0]; // "name"
+            const url = `https://cdn.jsdelivr.net/gh/${user}/${repo}/${nome}.md`;
+
+            fetch(url)
+              .then(res => res.text())
+              .then(md => {
+                conteudo.innerHTML = marked.parse(md);
+                conteudo.classList.add('carregado');
+              })
+              .catch(err => {
+                conteudo.textContent = 'Erro ao carregar o arquivo';
+                console.error(err);
+              });
+          });
+
+          tabelaBody.appendChild(tr);
+        });
+      })
+      .catch(err => {
+        sidebar.textContent = 'Erro ao carregar list.csv';
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
